@@ -83,7 +83,7 @@ export default function ({Plugin, types: t}) {
         for (var i in imports) {
             let p = path.resolve(filename, imports[i].source);
             // check filename with opts
-            if (path.basename(p, '.js') == extraOptions.langpackImport) {
+            if (path.basename(p, '.js') == (extraOptions.langpackImport || "langutils")) {
                 let specifiers = imports[i].specifiers;
                 var localVar = null;
                 for (var n in specifiers) {
