@@ -13,23 +13,23 @@ $ npm install karfield/babel-plugin-langpack  --save-dev
 Use
 
 ```
-$ babel --plugins langpack some-code.js --extra langpackImport=langutils --extra langpackExport=/path/to/export/file.csv
+$ babel --plugins langpack some-code.js --extra langpackImport=langutils --extra langpackExportDir=/path/to/export/ --extra langpackFormant=csv
 ```
 
 or:
 
 ```
 require("babel").transform("code", { plugins: ["langpack"],
-  extra: ["langpackImport=langutils", "langpackExport=/path/to/export/file.csv"] });
+  extra: ["langpackImport=langutils", "langpackExportDir=/path/to/export/", "langpackFormat=csv"] });
 ```
 
 with webpack loader parameters:
 
 ```
-var babel="babel?optional[]=es7.objectRestSpread&optional[]=runtime&plugins[]=langpack&extra[]=langpackImport=langutils&extra[]=langpackExport=/path/to/export/file.csv"
+var babel="babel?optional[]=es7.objectRestSpread&optional[]=runtime&plugins[]=langpack&extra[]=langpackImport=langutils&extra[]=langpackExportDir=/path/to/export/&extra[]=langpackFormat=csv"
 ```
 
-the parameter: "langpackImport"  and "langpackExport"  are essential for langpack, so don't miss it.
+the parameter: "langpackImport", "langpackExportDir", "langpackFormat"  are essential for langpack, so don't miss it.
 
 # License
 

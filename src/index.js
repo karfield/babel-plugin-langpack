@@ -8,6 +8,20 @@ export default function ({Plugin, types: t}) {
         return s.replace(/^"|"$/gm, '');
     }
 
+    function mkdirRescursively(dirPath, mode) {
+        fs.mkdir(dirPath, mode, function(error) {
+            if (error && error.errno === 34) {
+                mkdirRescursively(path.dirname(dirPath), mode);
+                mkdir(dirPath, mode);
+            }
+        });
+    };
+
+    function wipeFile(file) {
+        fs.closeSync(fs.openSync(file, "w"));
+        fs.truncate(file, 0);
+    }
+
     function genHash(str){
         if (Array.prototype.reduce){
             return str.split("").reduce(function(a,b){
@@ -27,12 +41,12 @@ export default function ({Plugin, types: t}) {
 
     function printLoc(loc) {
         if (loc.start.line == loc.end.line) {
-            return loc.start.line + " [" +
+            return loc.start.line + "[" +
                 loc.start.column + ":" +
                 loc.end.column + "]";
         } else {
             return loc.start.line + "[" +
-                loc.start.column + "] - " +
+                loc.start.column + "]-" +
                 loc.end.line + "[" +
                 loc.end.column + "]";
         }
@@ -40,16 +54,21 @@ export default function ({Plugin, types: t}) {
 
     function exportAsMarkdown(mdFile, sourceFileName, calls) {
         let text = sourceFileName + "\n\n";
-        text += "| code loc | hash | locale | text |\n";
-        text += "| --- |\n";
+        text += "| code loc | hash |";
+        OPTIONAL_LOCALES.forEach((locale) => {
+            text += " text(" + locale + ") |";
+        });
+        text += "\n| --- |\n";
         calls.forEach((call) => {
             text += "|" + printLoc(call.loc);
             text += "|" + call.hash;
-            if (call.locale)
-                text += "|" + call.locale;
-            else
-                text += "|default";
-            text += "|" + call.text.replace(/\|/gm, "\\|") + "|\n";
+            OPTIONAL_LOCALES.forEach((locale) => {
+                if (locale == call.locale)
+                    text += "|" + call.text.replace(/\|/gm, "\\|");
+                else
+                    text += "|";
+            });
+            text += "|\n";
         });
 
         text += "\n";
@@ -64,18 +83,39 @@ export default function ({Plugin, types: t}) {
     }
 
     function exportAsCsv(csvFile, sourceFileName, calls) {
-        calls.forEach((call) => {
-            let line = wrapAsCsv(sourceFileName) + ",";
-            line += call.hash + ",";
-            line += wrapAsCsv(printLoc(call.loc)) + ",";
-            if (call.locale)
-                line += wrapAsCsv(call.locale) + ",";
-            else
-                line += "default,";
-            line += wrapAsCsv(call.text) + ",";
-            line += "\n";
-            fs.appendFile(csvFile, line);
+
+        let text = "source,hash,";
+        OPTIONAL_LOCALES.forEach((locale) => {
+            text += locale + ",";
         });
+        text += "\n";
+        calls.forEach((call) => {
+            text += wrapAsCsv(sourceFileName+":"+printLoc(call.loc)) + ",";
+            text += call.hash + ",";
+            OPTIONAL_LOCALES.forEach((locale) => {
+                if (locale == call.locale) {
+                    text += wrapAsCsv(call.text) + ",";
+                } else {
+                    text += ",";
+                }
+            });
+            text += "\n";
+        });
+        fs.appendFile(csvFile, text);
+    }
+
+    function exportAsJson(jsonFile, sourceFileName, calls) {
+        fs.appendFile(jsonFile, JSON.stringify({
+            source: sourceFileName,
+            text: calls.map((item) => {
+                let r =  {
+                    loc: printLoc(item.loc),
+                    hash: item.hash
+                };
+                r[item.locale] = item.text;
+                return r;
+            })
+        }, null, 4));
     }
 
     function findLangPackLocalVar(filename, metadata) {
@@ -152,7 +192,7 @@ export default function ({Plugin, types: t}) {
                         loc: node.loc,
                         hash: hash,
                         text: text,
-                        locale: locale
+                        locale: locale || "en_US"
                     });
 
                     text = "\"" + text + "\"";
@@ -177,25 +217,31 @@ export default function ({Plugin, types: t}) {
                 let topPath = file.opts.sourceRoot || extraOptions.sourceRoot || "/";
                 let sourceFileName = path.relative(topPath, file.opts.sourceFileName);
 
-                if (extraOptions.langpackExport) {
-                    let exportPath = extraOptions.langpackExport;
-                    if (!path.isAbsolute(exportPath))
-                        exportPath = path.resolve(topPath, exportPath);
+                if (extraOptions.langpackExportDir) {
+                    let exportDir = extraOptions.langpackExportDir;
+                    if (!path.isAbsolute(exportDir))
+                        exportDir = path.resolve(topPath, exportDir);
 
-                    if (!fs.existsSync(path.dirname(exportPath)))
-                        return;
-                    if (!fs.existsSync(exportPath)) {
-                        // touch export file
-                        fs.closeSync(fs.openSync(exportPath, "w"));
+                    let exportPath = path.join(exportDir, path.dirname(sourceFileName));
+                    mkdirRescursively(exportPath);
+                    exportPath = path.join(exportPath, path.basename(sourceFileName, ".js"));
+
+                    let format = extraOptions.langpackFormat || "csv";
+                    let exportFn = null;
+                    if (format == 'markdown' || format == "md") {
+                        exportPath += ".md";
+                        exportFn = exportAsMarkdown;
+                    } else if (format == 'csv') {
+                        exportPath += ".csv";
+                        exportFn = exportAsCsv;
+                    } else if (format == "json") {
+                        exportPath += ".json";
+                        exportFn = exportAsJson;
                     }
 
-                    let ext = path.extname(exportPath);
-                    if (ext == '.md') {
-                        exportAsMarkdown(exportPath, sourceFileName, langPackCalls);
-                    } else if (ext == '.csv') {
-                        exportAsCsv(exportPath, sourceFileName, langPackCalls);
-                    } else if (ext == ".json") {
-                        //exportAsJson(exportPath, sourceFileName, langPackCalls);
+                    if (exportFn) {
+                        wipeFile(exportPath);
+                        exportFn(exportPath, sourceFileName, langPackCalls);
                     }
                 }
             }
