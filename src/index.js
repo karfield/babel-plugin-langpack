@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs';
 
 const OPTIONAL_LOCALES = ['en_US', 'zh_CN'];
+const MAX_INDEX_COUNT = 1000;
 
 export default function ({Plugin, types: t}) {
     function trim(s) {
@@ -76,8 +77,36 @@ export default function ({Plugin, types: t}) {
     var callIndex; 
     var sourceFileName;
 
+    var globalMap;
+    var globalMapFile;
+    function checkAndLoadGlobalMap(dir) {
+        if (globalMap)
+            return;
+        globalMapFile = path.resolve(dir, 'langpack.map');
+        if (fs.existsSync(globalMapFile)) {
+            fs.readFile(globalMapFile, (err, data) => {
+                if (!err) {
+                    try {
+                        globalMap = JSON.parse(data);
+                    } catch (e) {}
+                }
+                if (!globalMap)
+                    globalMap = { indexCount: 0 };
+            });
+        } else {
+            fs.closeSync(fs.openSync(globalMapFile, "w"));
+            globalMap = { indexCount: 0 };
+        }
+    }
+
+    function updateGlobalMap() {
+        fs.writeFile(globalMapFile, JSON.stringify(globalMap, null, 2));
+    }
+
     return new Plugin("langpack", {
         pre(file) {
+
+            langPackCalls = null;
             extraOptions = {};
             if (file.opts.extra.length > 0) {
                 file.opts.extra.forEach((item) => {
@@ -99,14 +128,18 @@ export default function ({Plugin, types: t}) {
                 if (!path.isAbsolute(exportDir))
                     exportDir = path.resolve(topPath, exportDir);
 
+                checkAndLoadGlobalMap(exportDir);
+
                 exportPath = path.join(exportDir, path.dirname(sourceFileName));
                 mkdirRescursively(exportPath);
                 exportPath = path.join(exportPath, path.basename(sourceFileName, ".js") + ".json");
 
                 if (fs.existsSync(exportPath)) {
                     fs.readFile(exportPath, (err, data) => {
-                        oldData = JSON.parse(data);
-                        callIndex = oldData.callIndex;
+                        try {
+                            oldData = JSON.parse(data);
+                            callIndex = oldData.callIndex;
+                        } catch(e) {}
                     });
                 }
             }
@@ -151,7 +184,11 @@ export default function ({Plugin, types: t}) {
                     if (oldData && oldData.text[hash]) {
                         index = oldData.text[hash].index;
                     } else {
-                        index = ++callIndex;
+                        if (index >= MAX_INDEX_COUNT) {
+                            callIndex = 0;
+                        } else
+                            callIndex ++;
+                        index = callIndex;
                     }
 
                     if (!langPackCalls)
@@ -177,12 +214,16 @@ export default function ({Plugin, types: t}) {
                         };
                     }
 
+                    if (!globalMap[sourceFileName])
+                        globalMap[sourceFileName] = globalMap.indexCount ++;
+                    index = globalMap[sourceFileName] * MAX_INDEX_COUNT + index;
+
                     if (locale) {
                         this.replaceWithSourceString(
-                            this.context.state.langPackFn + "(" + hash + "," + locale + ")");
+                            this.context.state.langPackFn + "(" + index + "," + locale + ")");
                     } else {
                         this.replaceWithSourceString(
-                            this.context.state.langPackFn + "(" + hash + ")");
+                            this.context.state.langPackFn + "(" + index + ")");
                     }
 
                 }
@@ -199,12 +240,15 @@ export default function ({Plugin, types: t}) {
                     fs.writeFile(exportPath, JSON.stringify({
                         callIndex: callIndex,
                         source: sourceFileName,
+                        hashPrefix: globalMap[sourceFileName] * MAX_INDEX_COUNT,
                         text: langPackCalls
                     }, null, 2));
                 } else {
                     if (fs.existsSync(exportPath))
                         fs.unlink(exportPath);
                 }
+
+                updateGlobalMap();
             }
         }
     });
