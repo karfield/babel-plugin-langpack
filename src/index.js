@@ -195,16 +195,12 @@ export default function ({Plugin, types: t}) {
                         locale: locale || "en_US"
                     });
 
-                    text = "\"" + text + "\"";
                     if (locale) {
                         this.replaceWithSourceString(
-                            this.context.state.langPackFn + "("
-                                + text + "," + hash + ","
-                                + locale + ")");
+                            this.context.state.langPackFn + "(" + hash + "," + locale + ")");
                     } else {
                         this.replaceWithSourceString(
-                            this.context.state.langPackFn + "("
-                                + text + "," + hash + ")");
+                            this.context.state.langPackFn + "(" + hash + ")");
                     }
 
                 }
