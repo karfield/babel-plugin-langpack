@@ -1,6 +1,6 @@
 # langPack generator plugin for Babel
 
-This plugin is used to traverse the code and replace 'L' callback as append a hash value, it alse generates a langpack export file, which you can translate your localizton file in csv or markdown file.
+This plugin is used to traverse the code and replace 'L' callback as append a hash value, it alse generates a langpack export file, which you can translate your localizton file in a json file.
 
 # Usage
 
@@ -13,23 +13,23 @@ $ npm install karfield/babel-plugin-langpack  --save-dev
 Use
 
 ```
-$ babel --plugins langpack some-code.js --extra langpackImport=langutils --extra langpackExportDir=/path/to/export/ --extra langpackFormant=csv
+$ babel --plugins langpack some-code.js --extra langpackImport=langutils --extra langpackExportDir=/path/to/export/
 ```
 
 or:
 
 ```
 require("babel").transform("code", { plugins: ["langpack"],
-  extra: ["langpackImport=langutils", "langpackExportDir=/path/to/export/", "langpackFormat=csv"] });
+  extra: ["langpackImport=langutils", "langpackExportDir=/path/to/export/"] });
 ```
 
 with webpack loader parameters:
 
 ```
-var babel="babel?optional[]=es7.objectRestSpread&optional[]=runtime&plugins[]=langpack&extra[]=langpackImport=langutils&extra[]=langpackExportDir=/path/to/export/&extra[]=langpackFormat=csv"
+var babel="babel?optional[]=es7.objectRestSpread&optional[]=runtime&plugins[]=langpack&extra[]=langpackImport=langutils&extra[]=langpackExportDir=/path/to/export/"
 ```
 
-the parameter: "langpackImport", "langpackExportDir", "langpackFormat"  are essential for langpack, so don't miss it.
+the parameter: "langpackImport" and "langpackExportDir"  are essential for langpack, so don't miss it.
 
 # License
 

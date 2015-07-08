@@ -17,12 +17,7 @@ export default function ({Plugin, types: t}) {
         });
     };
 
-    function wipeFile(file) {
-        fs.closeSync(fs.openSync(file, "w"));
-        fs.truncate(file, 0);
-    }
-
-    function genHash(str){
+    function hashText(str){
         if (Array.prototype.reduce){
             return str.split("").reduce(function(a,b){
                 a=((a<<5)-a)+b.charCodeAt(0);
@@ -52,72 +47,6 @@ export default function ({Plugin, types: t}) {
         }
     }
 
-    function exportAsMarkdown(mdFile, sourceFileName, calls) {
-        let text = sourceFileName + "\n\n";
-        text += "| code loc | hash |";
-        OPTIONAL_LOCALES.forEach((locale) => {
-            text += " text(" + locale + ") |";
-        });
-        text += "\n| --- |\n";
-        calls.forEach((call) => {
-            text += "|" + printLoc(call.loc);
-            text += "|" + call.hash;
-            OPTIONAL_LOCALES.forEach((locale) => {
-                if (locale == call.locale)
-                    text += "|" + call.text.replace(/\|/gm, "\\|");
-                else
-                    text += "|";
-            });
-            text += "|\n";
-        });
-
-        text += "\n";
-        fs.appendFile(mdFile, text);
-    }
-
-    function wrapAsCsv(item) {
-        item = item.replace(/\"/gm, '\"\"');
-        if (/[\s,]/g.test(item))
-            item = "\"" + item + "\"";
-        return item;
-    }
-
-    function exportAsCsv(csvFile, sourceFileName, calls) {
-
-        let text = "source,hash,";
-        OPTIONAL_LOCALES.forEach((locale) => {
-            text += locale + ",";
-        });
-        text += "\n";
-        calls.forEach((call) => {
-            text += wrapAsCsv(sourceFileName+":"+printLoc(call.loc)) + ",";
-            text += call.hash + ",";
-            OPTIONAL_LOCALES.forEach((locale) => {
-                if (locale == call.locale) {
-                    text += wrapAsCsv(call.text) + ",";
-                } else {
-                    text += ",";
-                }
-            });
-            text += "\n";
-        });
-        fs.appendFile(csvFile, text);
-    }
-
-    function exportAsJson(jsonFile, sourceFileName, calls) {
-        fs.appendFile(jsonFile, JSON.stringify({
-            source: sourceFileName,
-            text: calls.map((item) => {
-                let r =  {
-                    loc: printLoc(item.loc),
-                    hash: item.hash
-                };
-                r[item.locale] = item.text;
-                return r;
-            })
-        }, null, 4));
-    }
-
     function findLangPackLocalVar(filename, metadata) {
         let imports = metadata.modules.imports;
         for (var i in imports) {
@@ -140,12 +69,15 @@ export default function ({Plugin, types: t}) {
         return null;
     }
 
-    var langPackCalls = [];
-    var extraOptions = null;
+    var langPackCalls;
+    var extraOptions;
+    var exportPath;
+    var oldData;
+    var callIndex; 
+    var sourceFileName;
 
     return new Plugin("langpack", {
         pre(file) {
-            langPackCalls = [];
             extraOptions = {};
             if (file.opts.extra.length > 0) {
                 file.opts.extra.forEach((item) => {
@@ -153,9 +85,42 @@ export default function ({Plugin, types: t}) {
                     extraOptions[ss[0]] = ss[1];
                 });
             }
+
+            exportPath = null;
+            oldData = null;
+            callIndex = 0;
+
+            if (extraOptions.langpackExportDir) {
+
+                let topPath = file.opts.sourceRoot || extraOptions.sourceRoot || "/";
+                sourceFileName = path.relative(topPath, file.opts.sourceFileName);
+
+                let exportDir = extraOptions.langpackExportDir;
+                if (!path.isAbsolute(exportDir))
+                    exportDir = path.resolve(topPath, exportDir);
+
+                exportPath = path.join(exportDir, path.dirname(sourceFileName));
+                mkdirRescursively(exportPath);
+                exportPath = path.join(exportPath, path.basename(sourceFileName, ".js") + ".json");
+
+                if (fs.existsSync(exportPath)) {
+                    fs.readFile(exportPath, (err, data) => {
+                        oldData = JSON.parse(data);
+                        callIndex = oldData.callIndex;
+                    });
+                }
+            }
+
+            if (!sourceFileName) {
+                sourceFileName = file.opts.sourceFileName;
+            }
         },
+
         visitor: {
             CallExpression(node, parent, scope, file) {
+                if (!exportPath)
+                    return; // no needs to go futher
+
                 let filename = this.state.opts.filename;
                 if (!this.context.state.langPackFn) {
                     let fn = findLangPackLocalVar(filename, file.metadata);
@@ -175,25 +140,42 @@ export default function ({Plugin, types: t}) {
                             if (idx != node.arguments.length -1) {
                                 return trim(arg.raw);
                             }
-                            if (OPTIONAL_LOCALES.indexOf(arg.value) > 0) {
-                                locale = arg.value;
-                            }
                         });
                         text = args.join("");
                     } else {
                         text = trim(node.arguments[0].raw);
                     }
 
-                    let hash = genHash(filename + printLoc(node.loc));
-                    if (hash < 0)
-                        hash *= -1;
+                    let hash = hashText(text).toString();
+                    let index;
+                    if (oldData && oldData.text[hash]) {
+                        index = oldData.text[hash].index;
+                    } else {
+                        index = ++callIndex;
+                    }
 
-                    langPackCalls.push({
-                        loc: node.loc,
-                        hash: hash,
-                        text: text,
-                        locale: locale || "en_US"
-                    });
+                    if (!langPackCalls)
+                        langPackCalls = {};
+
+                    if (langPackCalls[hash]) {
+                        langPackCalls[hash].locations.push([
+                            node.loc.start.line,
+                            node.loc.start.column,
+                            node.loc.end.line,
+                            node.loc.end.column
+                        ]);
+                    } else {
+                        langPackCalls[hash] = {
+                            locations: [[
+                                node.loc.start.line,
+                                node.loc.start.column,
+                                node.loc.end.line,
+                                node.loc.end.column
+                            ]],
+                            index: index,
+                            text: text
+                        };
+                    }
 
                     if (locale) {
                         this.replaceWithSourceString(
@@ -208,37 +190,20 @@ export default function ({Plugin, types: t}) {
         },
 
         post(file) {
-            if (langPackCalls.length > 0) {
-
-                let topPath = file.opts.sourceRoot || extraOptions.sourceRoot || "/";
-                let sourceFileName = path.relative(topPath, file.opts.sourceFileName);
-
-                if (extraOptions.langpackExportDir) {
-                    let exportDir = extraOptions.langpackExportDir;
-                    if (!path.isAbsolute(exportDir))
-                        exportDir = path.resolve(topPath, exportDir);
-
-                    let exportPath = path.join(exportDir, path.dirname(sourceFileName));
-                    mkdirRescursively(exportPath);
-                    exportPath = path.join(exportPath, path.basename(sourceFileName, ".js"));
-
-                    let format = extraOptions.langpackFormat || "csv";
-                    let exportFn = null;
-                    if (format == 'markdown' || format == "md") {
-                        exportPath += ".md";
-                        exportFn = exportAsMarkdown;
-                    } else if (format == 'csv') {
-                        exportPath += ".csv";
-                        exportFn = exportAsCsv;
-                    } else if (format == "json") {
-                        exportPath += ".json";
-                        exportFn = exportAsJson;
-                    }
-
-                    if (exportFn) {
-                        wipeFile(exportPath);
-                        exportFn(exportPath, sourceFileName, langPackCalls);
-                    }
+            if (exportPath) {
+                if (langPackCalls) {
+                    if (!fs.existsSync(exportPath))
+                        fs.closeSync(fs.openSync(exportPath, "w"));
+                    else
+                        fs.truncateSync(exportPath, 0);
+                    fs.writeFile(exportPath, JSON.stringify({
+                        callIndex: callIndex,
+                        source: sourceFileName,
+                        text: langPackCalls
+                    }, null, 2));
+                } else {
+                    if (fs.existsSync(exportPath))
+                        fs.unlink(exportPath);
                 }
             }
         }
