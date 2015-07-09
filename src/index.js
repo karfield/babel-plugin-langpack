@@ -80,8 +80,10 @@ export default function ({Plugin, types: t}) {
     var globalMap;
     var globalMapFile;
     function checkAndLoadGlobalMap(dir) {
-        if (globalMap)
+        /*if (globalMap) {
+            console.log(globalMap);
             return;
+        }*/
         globalMapFile = path.resolve(dir, 'langpack.map');
         if (fs.existsSync(globalMapFile)) {
             fs.readFile(globalMapFile, (err, data) => {
