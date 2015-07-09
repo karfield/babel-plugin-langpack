@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import crc from 'crc';
 
 const OPTIONAL_LOCALES = ['en_US', 'zh_CN'];
 const MAX_INDEX_COUNT = 1000;
@@ -76,38 +77,17 @@ export default function ({Plugin, types: t}) {
     var oldData;
     var callIndex; 
     var sourceFileName;
+    var hashPrefix;
 
-    var globalMap;
-    var globalMapFile;
-    function checkAndLoadGlobalMap(dir) {
-        /*if (globalMap) {
-            console.log(globalMap);
-            return;
-        }*/
-        globalMapFile = path.resolve(dir, 'langpack.map');
-        if (fs.existsSync(globalMapFile)) {
-            fs.readFile(globalMapFile, (err, data) => {
-                if (!err) {
-                    try {
-                        globalMap = JSON.parse(data);
-                    } catch (e) {}
-                }
-                if (!globalMap)
-                    globalMap = { indexCount: 0 };
-            });
-        } else {
-            fs.closeSync(fs.openSync(globalMapFile, "w"));
-            globalMap = { indexCount: 0 };
-        }
-    }
-
-    function updateGlobalMap() {
-        fs.writeFile(globalMapFile, JSON.stringify(globalMap, null, 2));
+    function touch(path) {
+        if (!fs.existsSync(path))
+            fs.closeSync(fs.openSync(path, "w"));
     }
 
     return new Plugin("langpack", {
         pre(file) {
 
+            hashPrefix = null;
             langPackCalls = null;
             extraOptions = {};
             if (file.opts.extra.length > 0) {
@@ -129,8 +109,6 @@ export default function ({Plugin, types: t}) {
                 let exportDir = extraOptions.langpackExportDir;
                 if (!path.isAbsolute(exportDir))
                     exportDir = path.resolve(topPath, exportDir);
-
-                checkAndLoadGlobalMap(exportDir);
 
                 exportPath = path.join(exportDir, path.dirname(sourceFileName));
                 mkdirRescursively(exportPath);
@@ -216,9 +194,9 @@ export default function ({Plugin, types: t}) {
                         };
                     }
 
-                    if (!globalMap[sourceFileName])
-                        globalMap[sourceFileName] = globalMap.indexCount ++;
-                    index = globalMap[sourceFileName] * MAX_INDEX_COUNT + index;
+                    if (!hashPrefix)
+                        hashPrefix = crc.crc32(sourceFileName) * MAX_INDEX_COUNT;
+                    index = hashPrefix + index;
 
                     if (locale) {
                         this.replaceWithSourceString(
@@ -242,15 +220,13 @@ export default function ({Plugin, types: t}) {
                     fs.writeFile(exportPath, JSON.stringify({
                         callIndex: callIndex,
                         source: sourceFileName,
-                        hashPrefix: globalMap[sourceFileName] * MAX_INDEX_COUNT,
+                        hashPrefix: hashPrefix,
                         text: langPackCalls
                     }, null, 2));
                 } else {
                     if (fs.existsSync(exportPath))
                         fs.unlink(exportPath);
                 }
-
-                updateGlobalMap();
             }
         }
     });
