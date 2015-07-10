@@ -14,7 +14,7 @@ export default function ({Plugin, types: t}) {
         fs.mkdir(dirPath, mode, function(error) {
             if (error && error.errno === 34) {
                 mkdirRescursively(path.dirname(dirPath), mode);
-                mkdir(dirPath, mode);
+                fs.mkdir(dirPath, mode);
             }
         });
     };
@@ -54,7 +54,7 @@ export default function ({Plugin, types: t}) {
         for (var i in imports) {
             let p = path.resolve(filename, imports[i].source);
             // check filename with opts
-            if (path.basename(p, '.js') == (extraOptions.langpackImport || "langutils")) {
+            if (path.basename(p, '.js') == (extraOptions.langpackImportName || "langpack")) {
                 let specifiers = imports[i].specifiers;
                 var localVar = null;
                 for (var n in specifiers) {
