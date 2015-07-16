@@ -1,6 +1,6 @@
 {
   "name": "babel-plugin-langpack",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Generate langpack from source",
   "repository": {
     "type": "git",
@@ -22,15 +22,33 @@
     "babel-plugin"
   ],
   "gitHead": "858ef4e3b67cffe7947f62be06d21a3051351a93",
-  "readme": "# langPack generator plugin for Babel\n\nThis plugin is used to traverse the code and replace 'L' callback as append a hash value, it alse generates a langpack export file, which you can translate your localizton file in csv or markdown file.\n\n# Usage\n\ninstall:\n\n```\n$ npm install karfield/babel-plugin-langpack  --save-dev\n```\n\nUse\n\n```\n$ babel --plugins langpack some-code.js --extra langpackImport=langutils --extra langpackExport=/path/to/export/file.csv\n```\n\nor:\n\n```\nrequire(\"babel\").transform(\"code\", { plugins: [\"langpack\"],\n  extra: [\"langpackImport=langutils\", \"langpackExport=/path/to/export/file.csv\"] });\n```\n\nwith webpack loader parameters:\n\n```\nvar babel=\"babel?optional[]=es7.objectRestSpread&optional[]=runtime&plugins[]=langpack&extra[]=langpackImport=langutils&extra[]=langpackExport=/path/to/export/file.csv\"\n```\n\nthe parameter: \"langpackImport\"  and \"langpackExport\"  are essential for langpack, so don't miss it.\n\n# License\n\nThe MIT License (MIT)\n\nCopyright (c) 2015 Jed Watson\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n",
-  "readmeFilename": "README.md",
   "bugs": {
     "url": "https://github.com/babel-plugins/babel-plugin-langpack/issues"
   },
   "homepage": "https://github.com/babel-plugins/babel-plugin-langpack",
   "_id": "babel-plugin-langpack@0.1.0",
-  "_shasum": "05c33a59f6ebea716ee84a2b9830bdf41febfc6d",
-  "_from": "git://github.com/karfield/babel-plugin-langpack.git",
-  "_resolved": "git://github.com/karfield/babel-plugin-langpack.git#858ef4e3b67cffe7947f62be06d21a3051351a93",
-  "_fromGithub": true
+  "_shasum": "9a61f98bd556356950b3a45c93615611d3f990fe",
+  "_from": "https://registry.npmjs.org/babel-plugin-langpack/-/babel-plugin-langpack-0.1.0.tgz",
+  "_resolved": "https://registry.npmjs.org/babel-plugin-langpack/-/babel-plugin-langpack-0.1.0.tgz",
+  "_fromGithub": true,
+  "_npmVersion": "2.7.5",
+  "_nodeVersion": "0.12.2",
+  "_npmUser": {
+    "name": "karfield",
+    "email": "lab@karfield.com"
+  },
+  "dist": {
+    "shasum": "9a61f98bd556356950b3a45c93615611d3f990fe",
+    "tarball": "http://registry.npmjs.org/babel-plugin-langpack/-/babel-plugin-langpack-0.1.0.tgz"
+  },
+  "maintainers": [
+    {
+      "name": "karfield",
+      "email": "lab@karfield.com"
+    }
+  ],
+  "directories": {},
+  "dependencies": {
+    "mkdirp": "^0.5.1"
+  }
 }

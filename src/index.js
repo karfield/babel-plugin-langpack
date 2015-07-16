@@ -10,15 +10,6 @@ export default function ({Plugin, types: t}) {
         return s.replace(/^"|"$/gm, '');
     }
 
-    function mkdirRescursively(dirPath, mode) {
-        fs.mkdir(dirPath, mode, function(error) {
-            if (error && error.errno === 34) {
-                mkdirRescursively(path.dirname(dirPath), mode);
-                fs.mkdir(dirPath, mode);
-            }
-        });
-    };
-
     function hashText(str){
         if (Array.prototype.reduce){
             return str.split("").reduce(function(a,b){
@@ -79,27 +70,23 @@ export default function ({Plugin, types: t}) {
     var sourceFileName;
     var hashPrefix;
 
-    function touch(path) {
-        if (!fs.existsSync(path))
-            fs.closeSync(fs.openSync(path, "w"));
-    }
-
     return new Plugin("langpack", {
         pre(file) {
 
+            exportPath = null;
+            oldData = null;
+            sourceFileName = null;
+            callIndex = 0;
             hashPrefix = null;
             langPackCalls = null;
             extraOptions = {};
+
             if (file.opts.extra.length > 0) {
                 file.opts.extra.forEach((item) => {
                     let ss = item.split("=", 2);
                     extraOptions[ss[0]] = ss[1];
                 });
             }
-
-            exportPath = null;
-            oldData = null;
-            callIndex = 0;
 
             if (extraOptions.langpackExportDir) {
 
@@ -110,18 +97,23 @@ export default function ({Plugin, types: t}) {
                 if (!path.isAbsolute(exportDir))
                     exportDir = path.resolve(topPath, exportDir);
 
-                exportPath = path.join(exportDir, path.dirname(sourceFileName));
-                mkdirRescursively(exportPath);
-                exportPath = path.join(exportPath, path.basename(sourceFileName, ".js") + ".json");
+                fs.exists(exportDir, (exists) => {
+                    if (!exists)
+                        fs.mkdir(exportDir);
+                });
 
-                if (fs.existsSync(exportPath)) {
-                    fs.readFile(exportPath, (err, data) => {
-                        try {
-                            oldData = JSON.parse(data);
-                            callIndex = oldData.callIndex;
-                        } catch(e) {}
-                    });
-                }
+                let filename = sourceFileName.replace(/[\\\/]/gm, '_') + ".json";
+                exportPath = path.join(exportDir, filename);
+                fs.exists(exportPath, (exists) => {
+                    if (exists) {
+                        fs.readFile(exportPath, (err, data) => {
+                            try {
+                                oldData = JSON.parse(data);
+                                callIndex = oldData.callIndex;
+                            } catch(e) {}
+                        });
+                    }
+                });
             }
 
             if (!sourceFileName) {
@@ -213,10 +205,7 @@ export default function ({Plugin, types: t}) {
         post(file) {
             if (exportPath) {
                 if (langPackCalls) {
-                    if (!fs.existsSync(exportPath))
-                        fs.closeSync(fs.openSync(exportPath, "w"));
-                    else
-                        fs.truncateSync(exportPath, 0);
+                    fs.closeSync(fs.openSync(exportPath, "w"));
                     fs.writeFile(exportPath, JSON.stringify({
                         callIndex: callIndex,
                         source: sourceFileName,
@@ -224,8 +213,9 @@ export default function ({Plugin, types: t}) {
                         text: langPackCalls
                     }, null, 2));
                 } else {
-                    if (fs.existsSync(exportPath))
+                    /*fs.exists(exportPath, (exists) => {
                         fs.unlink(exportPath);
+                    });*/
                 }
             }
         }
